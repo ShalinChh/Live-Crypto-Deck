@@ -37,7 +37,8 @@ export function TopCoins({ onSelectSymbol, activeSymbol }: TopCoinsProps) {
         // OR just fetch REST API periodically. 
         // For "Live" feel, let's try the WebSocket miniTicker stream for all symbols
 
-        const ws = new WebSocket('wss://stream.binance.com/ws/!miniTicker@arr');
+        // Use Binance.US WebSocket for live ticker
+        const ws = new WebSocket('wss://stream.binance.us:9443/ws/!miniTicker@arr');
 
         ws.onmessage = (event) => {
             const data = JSON.parse(event.data);

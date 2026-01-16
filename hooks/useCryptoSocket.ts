@@ -96,7 +96,8 @@ export const useCryptoSocket = (symbol: string = 'btcusdt', interval: string = '
         // We want both trade (for price) and kline (for chart)
         // Stream Names: <symbol>@trade / <symbol>@kline_<interval>
         const streams = [`${symbol}@trade`, `${symbol}@kline_${interval}`].join('/');
-        const ws = new WebSocket(`wss://stream.binance.com/stream?streams=${streams}`);
+        // Use Binance.US for US users (avoids geoblocking)
+        const ws = new WebSocket(`wss://stream.binance.us:9443/stream?streams=${streams}`);
 
         socketRef.current = ws;
 
