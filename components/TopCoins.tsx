@@ -36,14 +36,20 @@ export function TopCoins({ onSelectSymbol, activeSymbol }: TopCoinsProps) {
         // Use Coinbase WebSocket (Very reliable)
         const ws = new WebSocket('wss://ws-feed.exchange.coinbase.com');
 
+        const subscribe = () => {
+            if (ws.readyState === WebSocket.OPEN) {
+                const subscribeMessage = {
+                    type: "subscribe",
+                    product_ids: COINS.map(c => c.id),
+                    channels: ["ticker"]
+                };
+                ws.send(JSON.stringify(subscribeMessage));
+            }
+        };
+
         ws.onopen = () => {
             console.log("TopCoins: Connected to Coinbase WS");
-            const subscribeMessage = {
-                type: "subscribe",
-                product_ids: COINS.map(c => c.id),
-                channels: ["ticker"]
-            };
-            ws.send(JSON.stringify(subscribeMessage));
+            subscribe();
         };
 
         ws.onerror = (err: any) => {
