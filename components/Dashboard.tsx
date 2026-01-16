@@ -12,7 +12,7 @@ export function Dashboard() {
     const [activeSymbol, setActiveSymbol] = useState<string>('BTCUSDT'); // Default
 
     const timelineConfig: Record<string, { interval: string; limit: number; label: string }> = {
-        '5m': { interval: '1m', limit: 15, label: '5 Minute' },
+        '5m': { interval: '1m', limit: 5, label: '5 Minute' },
         '1h': { interval: '1m', limit: 60, label: '1 Hour' },
         '24h': { interval: '15m', limit: 96, label: '24 Hour' },
     };

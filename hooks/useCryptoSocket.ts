@@ -92,7 +92,32 @@ export const useCryptoSocket = (symbol: string = 'btcusdt', interval: string = '
 
         fetchHistory();
 
-        // Use Coinbase WebSocket (Reliable, Global)
+
+
+        // 1. Initial Snapshot via REST API (Instant Data)
+        const fetchSnapshot = async () => {
+            try {
+                // Map symbol for Coinbase API
+                const pid = symbol.toUpperCase().replace('USDT', '-USD').replace('BUSD', '-USD');
+                const res = await fetch(`https://api.exchange.coinbase.com/products/${pid}/ticker`);
+                if (res.ok) {
+                    const data = await res.json();
+                    setTicker({
+                        price: data.price,
+                        prevPrice: data.price, // We don't have prev price yet
+                        time: new Date(data.time).getTime()
+                    });
+                    // If we have data, we feel "connected" enough to show UI
+                    setIsConnected(true);
+                }
+            } catch (e) {
+                console.error("Ticker REST fetch failed", e);
+            }
+        };
+
+        fetchSnapshot();
+
+        // 2. WebSocket for Live Updates
         const ws = new WebSocket('wss://ws-feed.exchange.coinbase.com');
 
         // Map symbol to Coinbase Product ID (e.g. BTCUSDT -> BTC-USD)
@@ -100,16 +125,21 @@ export const useCryptoSocket = (symbol: string = 'btcusdt', interval: string = '
 
         socketRef.current = ws;
 
+        const subscribe = () => {
+            if (ws.readyState === WebSocket.OPEN) {
+                const msg = {
+                    type: "subscribe",
+                    product_ids: [productId],
+                    channels: ["ticker"]
+                };
+                ws.send(JSON.stringify(msg));
+            }
+        };
+
         ws.onopen = () => {
             console.log('Connected to Coinbase WebSocket for', productId);
             setIsConnected(true);
-
-            const msg = {
-                type: "subscribe",
-                product_ids: [productId],
-                channels: ["ticker"]
-            };
-            ws.send(JSON.stringify(msg));
+            subscribe();
         };
 
         ws.onmessage = (event) => {
