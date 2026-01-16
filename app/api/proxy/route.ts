@@ -17,7 +17,6 @@ export async function GET(request: Request) {
     let aggregate = 1;
 
     switch (interval) {
-        case '1s': // Not supported, fallback to 1m
         case '1m':
             endpoint = 'histominute';
             aggregate = 1;

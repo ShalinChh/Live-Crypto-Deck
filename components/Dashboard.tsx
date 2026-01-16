@@ -12,9 +12,9 @@ export function Dashboard() {
     const [activeSymbol, setActiveSymbol] = useState<string>('BTCUSDT'); // Default
 
     const timelineConfig: Record<string, { interval: string; limit: number; label: string }> = {
-        '5m': { interval: '1s', limit: 300, label: '5 Minute' },
-        '1h': { interval: '1m', limit: 60, label: '1 Hour' },
-        '24h': { interval: '5m', limit: 288, label: '24 Hour' },
+        '5m': { interval: '1m', limit: 10, label: '5 Minute' },
+        '1h': { interval: '5m', limit: 24, label: '1 Hour' }, // 24 * 5m = 120m (2 hours). Let's do limit 12 for 1 hour.
+        '24h': { interval: '1h', limit: 24, label: '24 Hour' },
     };
 
     const config = timelineConfig[timeframe];

@@ -37,12 +37,17 @@ export function TopCoins({ onSelectSymbol, activeSymbol }: TopCoinsProps) {
         const ws = new WebSocket('wss://ws-feed.exchange.coinbase.com');
 
         ws.onopen = () => {
+            console.log("TopCoins: Connected to Coinbase WS");
             const subscribeMessage = {
                 type: "subscribe",
                 product_ids: COINS.map(c => c.id),
                 channels: ["ticker"]
             };
             ws.send(JSON.stringify(subscribeMessage));
+        };
+
+        ws.onerror = (err: any) => {
+            console.error("TopCoins: WebSocket Error", err);
         };
 
         ws.onmessage = (event) => {
