@@ -92,54 +92,41 @@ export const useCryptoSocket = (symbol: string = 'btcusdt', interval: string = '
 
         fetchHistory();
 
-        // Connect to Binance Public Stream
-        // We want both trade (for price) and kline (for chart)
-        // Stream Names: <symbol>@trade / <symbol>@kline_<interval>
-        const streams = [`${symbol}@trade`, `${symbol}@kline_${interval}`].join('/');
-        // Use Binance.US for US users (avoids geoblocking)
-        const ws = new WebSocket(`wss://stream.binance.us:9443/stream?streams=${streams}`);
+        // Use Coinbase WebSocket (Reliable, Global)
+        const ws = new WebSocket('wss://ws-feed.exchange.coinbase.com');
+
+        // Map symbol to Coinbase Product ID (e.g. BTCUSDT -> BTC-USD)
+        const productId = symbol.toUpperCase().replace('USDT', '-USD').replace('BUSD', '-USD');
 
         socketRef.current = ws;
 
         ws.onopen = () => {
-            console.log('Connected to Binance WebSocket');
+            console.log('Connected to Coinbase WebSocket for', productId);
             setIsConnected(true);
+
+            const msg = {
+                type: "subscribe",
+                product_ids: [productId],
+                channels: ["ticker"]
+            };
+            ws.send(JSON.stringify(msg));
         };
 
         ws.onmessage = (event) => {
-            const message = JSON.parse(event.data);
-            if (!message.data) return; // invalid format
+            const data = JSON.parse(event.data);
 
-            const data = message.data; // Wrapper from combined stream
-
-            if (data.e === 'trade') {
+            if (data.type === 'ticker' && data.product_id === productId) {
+                // Parse Ticker Data
                 setTicker(prev => ({
-                    price: data.p,
-                    prevPrice: prev?.price || data.p,
-                    time: Number(message.data.E) || Date.now(), // Use event time if available
+                    price: data.price,
+                    prevPrice: prev?.price || data.price,
+                    time: new Date(data.time).getTime(),
                 }));
-            } else if (data.e === 'kline') {
-                const k = data.k;
-                const candle: CandleData = {
-                    time: k.t,
-                    open: parseFloat(k.o),
-                    high: parseFloat(k.h),
-                    low: parseFloat(k.l),
-                    close: parseFloat(k.c),
-                };
 
-                // Update candles state
-                setCandles(prev => {
-                    const lastCandle = prev[prev.length - 1];
-                    // If same candle (same time), update it. Else append.
-                    if (lastCandle && lastCandle.time === candle.time) {
-                        return [...prev.slice(0, -1), candle];
-                    } else {
-                        // Keep roughly the limit + buffer
-                        const maxCandles = limit + 10;
-                        return [...prev.slice(-maxCandles), candle];
-                    }
-                });
+                // Note: Coinbase WebSocket doesn't stream candles (klines) on public feed easily.
+                // We rely on the initial history fetch (via route.ts) for the chart.
+                // The live price ticker will update the UI, but the chart won't "tick" live candles 
+                // until the next history poll/refresh. This is a trade-off for reliability on Vercel.
             }
         };
 

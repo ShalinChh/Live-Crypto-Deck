@@ -11,17 +11,17 @@ interface CoinData {
     change24h: string;
 }
 
-// Top 10 Coins to track
+// Map to Coinbase Product IDs
 const COINS = [
-    { symbol: 'BTCUSDT', name: 'Bitcoin' },
-    { symbol: 'ETHUSDT', name: 'Ethereum' },
-    { symbol: 'BNBUSDT', name: 'BNB' },
-    { symbol: 'XRPUSDT', name: 'XRP' },
-    { symbol: 'SOLUSDT', name: 'Solana' },
-    { symbol: 'ADAUSDT', name: 'Cardano' },
-    { symbol: 'DOGEUSDT', name: 'Dogecoin' },
-    { symbol: 'AVAXUSDT', name: 'Avalanche' },
-    { symbol: 'DOTUSDT', name: 'Polkadot' },
+    { id: 'BTC-USD', symbol: 'BTCUSDT', name: 'Bitcoin' },
+    { id: 'ETH-USD', symbol: 'ETHUSDT', name: 'Ethereum' },
+    { id: 'BNB-USD', symbol: 'BNBUSDT', name: 'BNB' }, // Coinbase lists BNB-USD on API
+    { id: 'XRP-USD', symbol: 'XRPUSDT', name: 'XRP' },
+    { id: 'SOL-USD', symbol: 'SOLUSDT', name: 'Solana' },
+    { id: 'ADA-USD', symbol: 'ADAUSDT', name: 'Cardano' },
+    { id: 'DOGE-USD', symbol: 'DOGEUSDT', name: 'Dogecoin' },
+    { id: 'AVAX-USD', symbol: 'AVAXUSDT', name: 'Avalanche' },
+    { id: 'DOT-USD', symbol: 'DOTUSDT', name: 'Polkadot' },
 ];
 
 interface TopCoinsProps {
@@ -33,37 +33,43 @@ export function TopCoins({ onSelectSymbol, activeSymbol }: TopCoinsProps) {
     const [marketData, setMarketData] = useState<Record<string, CoinData>>({});
 
     useEffect(() => {
-        // We can use the !miniTicker@arr stream for all markets, filtering client side
-        // OR just fetch REST API periodically. 
-        // For "Live" feel, let's try the WebSocket miniTicker stream for all symbols
+        // Use Coinbase WebSocket (Very reliable)
+        const ws = new WebSocket('wss://ws-feed.exchange.coinbase.com');
 
-        // Use Binance.US WebSocket for live ticker
-        const ws = new WebSocket('wss://stream.binance.us:9443/ws/!miniTicker@arr');
+        ws.onopen = () => {
+            const subscribeMessage = {
+                type: "subscribe",
+                product_ids: COINS.map(c => c.id),
+                channels: ["ticker"]
+            };
+            ws.send(JSON.stringify(subscribeMessage));
+        };
 
         ws.onmessage = (event) => {
             const data = JSON.parse(event.data);
-            // data is an array of objects
-            // { s: symbol, c: close price, o: open price, h: high, l: low, v: volume, q: quote volume }
 
-            const updates: Record<string, CoinData> = {};
+            // Coinbase Ticker Format:
+            // { type: 'ticker', product_id: 'BTC-USD', price: '...', open_24h: '...', ... }
+            if (data.type === 'ticker' && data.product_id) {
+                const coin = COINS.find(c => c.id === data.product_id);
+                if (coin) {
+                    const price = parseFloat(data.price);
+                    const openPrice = parseFloat(data.open_24h || data.price); // Fallback if open_24h missing
+                    const change = openPrice > 0
+                        ? ((price - openPrice) / openPrice * 100).toFixed(2)
+                        : "0.00";
 
-            data.forEach((item: any) => {
-                const knownCoin = COINS.find(c => c.symbol === item.s);
-                if (knownCoin) {
-                    const price = parseFloat(item.c);
-                    const openPrice = parseFloat(item.o); // 24h open roughly
-                    const change = ((price - openPrice) / openPrice * 100).toFixed(2);
-
-                    updates[item.s] = {
-                        symbol: item.s,
-                        name: knownCoin.name,
-                        price: price.toFixed(price < 1 ? 4 : 2),
-                        change24h: change
-                    };
+                    setMarketData(prev => ({
+                        ...prev,
+                        [coin.symbol]: {
+                            symbol: coin.symbol,
+                            name: coin.name,
+                            price: price.toFixed(price < 1 ? 4 : 2),
+                            change24h: change
+                        }
+                    }));
                 }
-            });
-
-            setMarketData(prev => ({ ...prev, ...updates }));
+            }
         };
 
         return () => {
