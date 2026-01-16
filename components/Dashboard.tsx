@@ -12,13 +12,9 @@ export function Dashboard() {
     const [activeSymbol, setActiveSymbol] = useState<string>('BTCUSDT'); // Default
 
     const timelineConfig: Record<string, { interval: string; limit: number; label: string }> = {
-        '5m': { interval: '1m', limit: 30, label: '5 Minute' }, // Increased slightly for context
-        '1h': { interval: '5m', limit: 60, label: '1 Hour' }, // 60 * 5m = 5 hours? No, 1h view needs 1m interval really for detail? 
-        // Or if we use 5m candles, we need 12 of them for 1h. 
-        // Let's stick to user request: "see much more".
-        // Previous was limit 288 for 24h (288 * 5m = 24h).
-        // For 1h, maybe we want 1m interval with limit 60.
-        '24h': { interval: '1h', limit: 24, label: '24 Hour' }, // 24 * 1h = 24h.
+        '5m': { interval: '1m', limit: 15, label: '5 Minute' },
+        '1h': { interval: '1m', limit: 60, label: '1 Hour' },
+        '24h': { interval: '15m', limit: 96, label: '24 Hour' },
     };
 
     // Correction:

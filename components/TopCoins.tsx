@@ -33,7 +33,63 @@ export function TopCoins({ onSelectSymbol, activeSymbol }: TopCoinsProps) {
     const [marketData, setMarketData] = useState<Record<string, CoinData>>({});
 
     useEffect(() => {
-        // Use Coinbase WebSocket (Very reliable)
+        // 1. Initial Snapshot via REST API (Instant Data)
+        const fetchSnapshot = async () => {
+            try {
+                // Fetch ticker for each coin in parallel
+                const promises = COINS.map(async (coin) => {
+                    const res = await fetch(`https://api.exchange.coinbase.com/products/${coin.id}/ticker`);
+                    if (!res.ok) return null;
+                    const data = await res.json();
+                    return { ...data, symbol: coin.symbol, name: coin.name };
+                });
+
+                const results = await Promise.all(promises);
+
+                const updates: Record<string, CoinData> = {};
+                results.forEach((item: any) => {
+                    if (item && item.price) {
+                        const price = parseFloat(item.price);
+
+                        updates[item.symbol] = {
+                            symbol: item.symbol,
+                            name: item.name,
+                            price: price.toFixed(price < 1 ? 4 : 2),
+                            change24h: "..." // Placeholder until WS comes in
+                        };
+                    }
+                });
+                setMarketData(prev => ({ ...prev, ...updates }));
+
+                // Fetch stats for 24h change (Second pass)
+                COINS.forEach(async (coin) => {
+                    try {
+                        const res = await fetch(`https://api.exchange.coinbase.com/products/${coin.id}/stats`);
+                        if (res.ok) {
+                            const stats = await res.json();
+                            setMarketData(prev => {
+                                const current = prev[coin.symbol];
+                                if (!current) return prev;
+                                const last = parseFloat(current.price);
+                                const open = parseFloat(stats.open);
+                                const change = ((last - open) / open * 100).toFixed(2);
+                                return {
+                                    ...prev,
+                                    [coin.symbol]: { ...current, change24h: change }
+                                };
+                            });
+                        }
+                    } catch (e) { /* ignore */ }
+                });
+
+            } catch (e) {
+                console.error("TopCoins REST fetch failed", e);
+            }
+        };
+
+        fetchSnapshot();
+
+        // 2. WebSocket for Live Updates
         const ws = new WebSocket('wss://ws-feed.exchange.coinbase.com');
 
         const subscribe = () => {
@@ -59,13 +115,11 @@ export function TopCoins({ onSelectSymbol, activeSymbol }: TopCoinsProps) {
         ws.onmessage = (event) => {
             const data = JSON.parse(event.data);
 
-            // Coinbase Ticker Format:
-            // { type: 'ticker', product_id: 'BTC-USD', price: '...', open_24h: '...', ... }
             if (data.type === 'ticker' && data.product_id) {
                 const coin = COINS.find(c => c.id === data.product_id);
                 if (coin) {
                     const price = parseFloat(data.price);
-                    const openPrice = parseFloat(data.open_24h || data.price); // Fallback if open_24h missing
+                    const openPrice = parseFloat(data.open_24h || data.price);
                     const change = openPrice > 0
                         ? ((price - openPrice) / openPrice * 100).toFixed(2)
                         : "0.00";
